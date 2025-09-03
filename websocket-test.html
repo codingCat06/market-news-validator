@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="logs"></div>
+    
+    <script>
+        const logs = document.getElementById('logs');
+        const status = document.getElementById('status');
+        
+        function addLog(message) {
+            const p = document.createElement('p');
+            p.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            logs.appendChild(p);
+            console.log(message);
+        }
+        
+        // WebSocket 연결 테스트
+        const socket = io('http://localhost:3001', {
+            transports: ['websocket', 'polling'],
+            timeout: 20000,
+            forceNew: true,
+            autoConnect: true,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
+        });
+        
+        socket.on('connect', () => {
+            status.textContent = 'Connected';
+            status.style.color = 'green';
+            addLog('✅ Connected successfully. Socket ID: ' + socket.id);
+            
+            // 테스트용 room join
+            const testRequestId = 'test-' + Date.now();
+            addLog('📥 Joining test room: analysis-' + testRequestId);
+            socket.emit('join-analysis', testRequestId);
+        });
+        
+        socket.on('joined-analysis', (roomId) => {
+            addLog('✅ Successfully joined room: ' + roomId);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            status.textContent = 'Disconnected: ' + reason;
+            status.style.color = 'red';
+            addLog('❌ Disconnected: ' + reason);
+        });
+        
+        socket.on('connect_error', (error) => {
+            status.textContent = 'Connection Error';
+            status.style.color = 'red';
+            addLog('💥 Connection error: ' + error.message);
+        });
+        
+        socket.on('realtime-log', (data) => {
+            addLog('📨 Received log: ' + JSON.stringify(data));
+        });
+        
+        socket.on('progress', (data) => {
+            addLog('📡 Received progress: ' + JSON.stringify(data));
+        });
+    </script>
+</body>
+</html>

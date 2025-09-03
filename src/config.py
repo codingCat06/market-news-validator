@@ -8,26 +8,26 @@ load_dotenv()
 
 class Config:
     # 환경 변수에서 값을 가져오고, 없으면 기본값 사용
-    CACHE_DIR = os.getenv("CACHE_DIR") or "cache"
-    OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "reports"
+    CACHE_DIR = os.environ.get("CACHE_DIR") or "cache"
+    OUTPUT_DIR = os.environ.get("OUTPUT_DIR") or "reports"
     
     # 뉴스 수집 설정
-    NEWS_MAX_PAGES = int(os.getenv("NEWS_MAX_PAGES", "10"))
-    NEWS_REQUEST_DELAY = float(os.getenv("NEWS_REQUEST_DELAY", "1.0"))
-    NEWS_TIMEOUT = int(os.getenv("NEWS_TIMEOUT", "10"))
+    NEWS_MAX_PAGES = int(os.environ.get("NEWS_MAX_PAGES", "10"))
+    NEWS_REQUEST_DELAY = float(os.environ.get("NEWS_REQUEST_DELAY", "1.0"))
+    NEWS_TIMEOUT = int(os.environ.get("NEWS_TIMEOUT", "300"))  # 60초 -> 300초 (5분)
     
     # ECOS API 설정
-    ECOS_API_KEY = os.getenv("ECOS_API_KEY")
+    ECOS_API_KEY = os.environ.get("ECOS_API_KEY")
     ECOS_BASE_URL = "https://ecos.bok.or.kr/api"
-    ECOS_REQUEST_DELAY = float(os.getenv("ECOS_REQUEST_DELAY", "0.5"))
-    ECOS_TIMEOUT = int(os.getenv("ECOS_TIMEOUT", "10"))
+    ECOS_REQUEST_DELAY = float(os.environ.get("ECOS_REQUEST_DELAY", "0.5"))
+    ECOS_TIMEOUT = int(os.environ.get("ECOS_TIMEOUT", "300"))  # 60초 -> 300초 (5분)
     
     # 분석 설정
-    MIN_SIGNIFICANCE_SCORE = float(os.getenv("MIN_SIGNIFICANCE_SCORE", "0.5"))
-    MAX_TOP_NEWS = int(os.getenv("MAX_TOP_NEWS", "3"))
+    MIN_SIGNIFICANCE_SCORE = float(os.environ.get("MIN_SIGNIFICANCE_SCORE", "0.5"))
+    MAX_TOP_NEWS = int(os.environ.get("MAX_TOP_NEWS", "3"))
     
     # 로그 설정
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     
     # 파일 인코딩
     DEFAULT_ENCODING = "utf-8"

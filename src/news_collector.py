@@ -13,17 +13,25 @@ load_dotenv()
 
 try:
     from .config import Config, UserAgent
+    from .web_utils import safe_print
 except ImportError:
+    import sys
+    import os
+    # src 디렉토리를 path에 추가
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
     from config import Config, UserAgent
+    from web_utils import safe_print
 
 
 class NewsCollector:
     def __init__(self, cache_dir=None):
-        self.cache_dir = cache_dir or os.getenv("CACHE_DIR", "cache")
+        self.cache_dir = cache_dir or os.environ.get("CACHE_DIR", "cache")
         
         # 네이버 뉴스 API 설정
-        self.naver_client_id = os.getenv("NAVER_CLIENT_ID")
-        self.naver_client_secret = os.getenv("NAVER_CLIENT_SECRET")
+        self.naver_client_id = os.environ.get("NAVER_CLIENT_ID")
+        self.naver_client_secret = os.environ.get("NAVER_CLIENT_SECRET")
         self.naver_search_url = "https://openapi.naver.com/v1/search/news.json"
         
         self.session = requests.Session()
@@ -97,27 +105,34 @@ class NewsCollector:
         if isinstance(end_date, str):
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
 
+        print(f"🔍 {stock_name} 뉴스 수집 시작 ({start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')})")
+        safe_print(f"🔍 {stock_name} 뉴스 수집 시작 ({start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')})")
+        
         cached_data = self._load_cached_data(stock_name, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
         if cached_data:
-            print(f"캐시된 데이터를 사용합니다: {stock_name}")
+            safe_print(f"📦 캐시된 데이터 발견: {len(cached_data)}개 뉴스 재사용")
+            safe_print(f"✅ 캐시 데이터 로드 완료 - API 호출 생략")
             return cached_data
 
         if not self.naver_client_id or not self.naver_client_secret:
-            print("네이버 API 키가 설정되지 않았습니다. .env 파일에 NAVER_CLIENT_ID와 NAVER_CLIENT_SECRET을 설정해주세요.")
-            print("네이버 개발자 센터에서 API 키를 발급받으세요: https://developers.naver.com/")
+            safe_print("❌ 네이버 API 키가 설정되지 않았습니다. .env 파일에 NAVER_CLIENT_ID와 NAVER_CLIENT_SECRET을 설정해주세요.")
+            safe_print("🔗 네이버 개발자 센터에서 API 키를 발급받으세요: https://developers.naver.com/")
             return []
 
+        safe_print("🌐 네이버 뉴스 API 연결 시작")
         articles = []
         
         try:
             # 단일 검색어로 뉴스 수집 (이전 방식으로 복원)
-            max_pages = int(os.getenv('NEWS_MAX_PAGES', 3))
+            max_pages = int(os.environ.get('NEWS_MAX_PAGES', '3'))
             display_per_page = 100
             max_articles = 50  # 최대 수집 개수 제한
             
+            safe_print(f"📊 수집 설정: 최대 {max_pages}페이지, 페이지당 {display_per_page}개, 최대 {max_articles}개")
+            
             for page in range(max_pages):
                 if len(articles) >= max_articles:
-                    print(f"� 최대 수집 개수({max_articles}개)에 도달하여 수집을 중단합니다.")
+                    print(f"🛑 최대 수집 개수({max_articles}개)에 도달하여 수집을 중단합니다.")
                     break
                     
                 start_index = page * display_per_page + 1
@@ -130,27 +145,45 @@ class NewsCollector:
                     'sort': 'date'  # 날짜순 정렬
                 }
                 
-                print(f"📄 페이지 {page + 1} 검색 중... (검색어: {stock_name} 주식)")
-                response = self.session.get(self.naver_search_url, params=search_params, timeout=10)
+                print(f"� 페이지 {page + 1}/{max_pages} 요청 중... (검색어: '{stock_name} 주식', 시작 인덱스: {start_index})")
                 
-                if response.status_code != 200:
-                    print(f"❌ API 오류: {response.status_code}")
+                try:
+                    response = self.session.get(self.naver_search_url, params=search_params, timeout=10)
+                    print(f"📡 API 응답 수신: HTTP {response.status_code}")
+                except requests.exceptions.Timeout:
+                    print(f"⏰ 페이지 {page + 1} API 요청 타임아웃 (10초)")
+                    continue
+                except Exception as e:
+                    print(f"❌ 페이지 {page + 1} API 요청 실패: {str(e)}")
                     continue
                 
-                data = response.json()
+                if response.status_code != 200:
+                    print(f"⚠️ API 오류: HTTP {response.status_code} - 페이지 {page + 1} 건너뛰기")
+                    continue
+                
+                try:
+                    data = response.json()
+                    print(f"📋 JSON 데이터 파싱 완료")
+                except json.JSONDecodeError:
+                    print(f"❌ 페이지 {page + 1} JSON 파싱 실패")
+                    continue
                 
                 if 'items' not in data or not data['items']:
-                    print(f"⏭️ 페이지 {page + 1}에 더 이상 뉴스가 없습니다.")
+                    print(f"📭 페이지 {page + 1}에 더 이상 뉴스가 없습니다.")
                     break
                 
-                print(f"📊 페이지 {page + 1}에서 {len(data['items'])}개 발견")
+                page_items = data['items']
+                print(f"📄 페이지 {page + 1}에서 {len(page_items)}개 뉴스 발견")
                 
                 date_filtered_out = 0
                 parsing_errors = 0
-                page_articles = 0
+                page_articles_count = 0
                 
-                for item in data['items']:
+                print(f"🔍 페이지 {page + 1} 뉴스 분석 시작...")
+                
+                for i, item in enumerate(page_items):
                     if len(articles) >= max_articles:
+                        print(f"🛑 최대 수집량 도달 (현재: {len(articles)}개)")
                         break
                         
                     try:
@@ -171,40 +204,63 @@ class NewsCollector:
                                 'content': description
                             }
                             articles.append(article)
-                            page_articles += 1
-                            if page_articles <= 5:
-                                print(f"✅ 수집: {title[:40]}...")
+                            page_articles_count += 1
+                            
+                            # 처음 몇 개는 상세히 로그 출력
+                            if page_articles_count <= 3:
+                                print(f"✅ 뉴스 {len(articles)}번째 수집: {title[:50]}...")
+                                print(f"   📅 발행일: {pub_date.strftime('%Y-%m-%d %H:%M')}")
                         else:
                             date_filtered_out += 1
+                            if date_filtered_out <= 3:  # 처음 몇 개만 로그
+                                print(f"📅 날짜 범위 외: {title[:40]}... ({pub_date.strftime('%Y-%m-%d')})")
                     
                     except Exception as e:
                         parsing_errors += 1
+                        if parsing_errors <= 3:  # 처음 몇 개 오류만 로그
+                            print(f"❌ 파싱 오류: {str(e)[:50]}...")
                         continue
                 
-                print(f"📈 페이지 {page + 1} 결과: 수집 {page_articles}개, 날짜 필터링 {date_filtered_out}개, 오류 {parsing_errors}개")
+                print(f"📊 페이지 {page + 1} 완료: 수집 {page_articles_count}개, 날짜 필터 {date_filtered_out}개, 오류 {parsing_errors}개")
+                print(f"📈 현재 총 수집량: {len(articles)}개")
                 
                 # 조기 종료 조건
-                if page_articles == 0 and page > 1:
-                    print(f"⏹️ 연속해서 관련 뉴스가 없어 수집을 중단합니다.")
+                if page_articles_count == 0 and page > 0:
+                    print(f"⏹️ 페이지 {page + 1}에서 유효한 뉴스가 없어 수집을 중단합니다.")
                     break
                     
                 # API 요청 간격 조절
                 if page < max_pages - 1:
-                    time.sleep(float(os.getenv('NEWS_REQUEST_DELAY', 1.0)))
+                    delay = float(os.environ.get('NEWS_REQUEST_DELAY', '1.0'))
+                    print(f"⏳ API 요청 간격 대기 중... ({delay}초)")
+                    time.sleep(delay)
             
         except Exception as e:
-            print(f"네이버 API 요청 실패: {e}")
+            print(f"❌ 네이버 API 요청 실패: {e}")
             return []
 
+        print(f"🔄 중복 제거 시작... (현재: {len(articles)}개)")
         articles = self._remove_duplicates(articles)
+        print(f"✅ 중복 제거 완료 (남은 뉴스: {len(articles)}개)")
         
         # 중요도 순으로 정렬 및 상위 50개 선택 (이미 수집 시 제한했지만 추가 보장)
+        print(f"📊 뉴스 우선순위 정렬 및 최종 선별 중...")
         articles = self._prioritize_and_limit_articles(articles, max_articles=50)
+        print(f"🎯 최종 선별 완료: {len(articles)}개")
         
+        print(f"💾 캐시 저장 중...")
         self._save_to_cache(stock_name, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"), articles)
+        print(f"✅ 캐시 저장 완료")
         
-        print(f"\n🎉 {stock_name} 뉴스 총 {len(articles)}개 수집 완료 (최대 50개 제한)")
+        print(f"\n🎉 {stock_name} 뉴스 수집 완료!")
+        print(f"📊 최종 수집량: {len(articles)}개")
         print(f"📅 수집 기간: {start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+        
+        if articles:
+            print(f"📰 수집된 뉴스 샘플:")
+            for i, article in enumerate(articles[:3]):
+                print(f"   {i+1}. {article['title'][:60]}...")
+        
         return articles
 
     def _remove_html_tags(self, text):

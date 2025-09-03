@@ -9,6 +9,12 @@ from dotenv import load_dotenv
 try:
     from .config import Config
 except ImportError:
+    import sys
+    import os
+    # src 디렉토리를 path에 추가
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
     from config import Config
 
 # 환경변수 로드
@@ -18,7 +24,7 @@ load_dotenv()
 class StockNewsAnalyzer:
     def __init__(self, cache_dir=None):
         # OpenAI 클라이언트 초기화
-        api_key = os.getenv('OPENAI_API_KEY')
+        api_key = os.environ.get('OPENAI_API_KEY')
         if not api_key or api_key == 'your_openai_api_key_here':
             print("Warning: OpenAI API key not configured. Please set OPENAI_API_KEY in .env file")
             self.client = None
@@ -26,7 +32,7 @@ class StockNewsAnalyzer:
             self.client = OpenAI(api_key=api_key)
         
         # 캐시 디렉토리 설정
-        self.cache_dir = cache_dir or os.getenv("CACHE_DIR", "cache")
+        self.cache_dir = cache_dir or os.environ.get("CACHE_DIR", "cache")
         self.analysis_cache_dir = os.path.join(self.cache_dir, "analysis")
         if not os.path.exists(self.analysis_cache_dir):
             os.makedirs(self.analysis_cache_dir)
@@ -217,13 +223,23 @@ reasoning: 대규모 수주 계약 체결로 매출 증가가 예상됩니다.
 
     def analyze_news_batch(self, articles):
         """뉴스 배치 분석 (중복 제거 및 캐싱 포함)"""
+        try:
+            from .web_utils import safe_print
+        except ImportError:
+            from web_utils import safe_print
+        
+        safe_print(f"🧠 AI 감정 분석 시작: {len(articles)}개 뉴스")
+        
         # 1단계: 중복 기사 제거
+        safe_print(f"🔄 중복 뉴스 제거 중...")
         articles = self._deduplicate_articles(articles)
+        safe_print(f"✅ 중복 제거 완료: {len(articles)}개 뉴스")
         
         results = []
         cache_hits = 0
+        api_calls = 0
         
-        print(f"GPT-4o mini를 사용하여 {len(articles)}개 기사를 분석 중...")
+        safe_print(f"🤖 GPT-4o mini를 사용한 감정 분석 시작...")
         
         for i, article in enumerate(articles, 1):
             article_hash = self._get_article_hash(article)
@@ -233,13 +249,20 @@ reasoning: 대규모 수주 계약 체결로 매출 증가가 예상됩니다.
             if cached_analysis:
                 results.append(cached_analysis)
                 cache_hits += 1
-                print(f"📋 캐시 사용 ({i}/{len(articles)}) - {article.get('title', '')[:40]}...")
+                safe_print(f"💾 캐시 재사용 ({i}/{len(articles)}): {article.get('title', '')[:50]}...")
                 continue
             
-            print(f"🤖 AI 분석 중 ({i}/{len(articles)}) - {article.get('title', '')[:40]}...")
+            safe_print(f"🔍 OpenAI API 호출 중 ({i}/{len(articles)}): {article.get('title', '')[:50]}...")
             
             # GPT를 사용한 감정 분석
-            sentiment_result = self.analyze_sentiment_with_gpt(article)
+            try:
+                sentiment_result = self.analyze_sentiment_with_gpt(article)
+                api_calls += 1
+                safe_print(f"✅ AI 분석 완료: 감정={sentiment_result['sentiment']}, 신뢰도={sentiment_result['confidence']:.2f}")
+            except Exception as e:
+                safe_print(f"❌ AI 분석 실패: {str(e)[:50]}...")
+                continue
+                
             reliability = self.assess_reliability(article)
             
             # 사건 요약 추가
@@ -260,13 +283,22 @@ reasoning: 대규모 수주 계약 체결로 매출 증가가 예상됩니다.
             }
             
             # 분석 결과 캐시에 저장
+            safe_print(f"💾 분석 결과 캐시 저장 중...")
             self._save_analysis_cache(article_hash, analysis)
             results.append(analysis)
         
-        if cache_hits > 0:
-            print(f"✅ 분석 완료: 📋 캐시 재사용 {cache_hits}개, 🤖 새로 분석 {len(articles) - cache_hits}개")
-        else:
-            print(f"✅ 분석 완료: 🤖 새로 분석 {len(articles)}개 (캐시 데이터 없음)")
+        safe_print(f"\n🎉 감정 분석 완료!")
+        safe_print(f"📊 처리 결과: 총 {len(articles)}개")
+        safe_print(f"💾 캐시 재사용: {cache_hits}개")
+        safe_print(f"🤖 새로 분석: {api_calls}개")
+        safe_print(f"🔢 최종 결과: {len(results)}개")
+        
+        if results:
+            # 감정별 통계
+            positive = len([r for r in results if r['sentiment'] == 'positive'])
+            negative = len([r for r in results if r['sentiment'] == 'negative'])
+            neutral = len([r for r in results if r['sentiment'] == 'neutral'])
+            safe_print(f"📈 감정 분포: 긍정 {positive}개, 부정 {negative}개, 중립 {neutral}개")
         
         return sorted(results, key=lambda x: (abs(x['score']), x['confidence']), reverse=True)
     
@@ -896,25 +928,14 @@ investment_recommendation: [투자 관점 제안]
 
         # Timeline 분석 추가
         print("📅 Timeline 분석을 생성하는 중...")
-        timeline_analysis = self.generate_timeline_analysis(analyzed_news, end_date)
-        timeline_report = self.format_timeline_report(timeline_analysis)
-        report += "\n" + timeline_report
 
         report += f"""
 📝 종합 의견
 전체 시장 심리: {summary['overall_sentiment'].upper()}
 {summary['conclusion']}
 
-⚡ 본 분석의 특징:
-• GPT-4o mini를 통한 개별 기사 감정 분석
-• GPT-4o를 통한 전문가 수준의 종합 검증
-• 정부 정책 및 정치적 뉴스 통합 분석 (캐싱 지원)
-• 시간순 호재/악재 유효성 Timeline 분석
-• 제목과 날짜 기반 중복 기사 자동 제거
-• 분석 결과 캐싱으로 빠른 재분석 지원
-• 미래 전망까지 포함한 종합적 관점
 
-※ 본 분석은 OpenAI GPT-4o/GPT-4o mini API를 활용한 AI 기반 분석 결과입니다.
+※ 본 분석은 OpenAI 를 활용한 AI 기반 분석 결과입니다.
 ※ 투자 결정에 대한 모든 책임은 개인에게 있습니다.
 """
         
