@@ -1,0 +1,182 @@
+.progress-stack {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.progress-stack-header {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 8px;
+}
+
+.progress-stack-header h3 {
+  margin: 0;
+  color: #343a40;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.progress-stack-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-step {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid transparent;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.progress-step-waiting {
+  border-left-color: #6c757d;
+  background: #f8f9fa;
+}
+
+.progress-step-loading {
+  border-left-color: #007bff;
+  background: #e3f2fd;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.progress-step-success {
+  border-left-color: #28a745;
+  background: #f0f8f0;
+}
+
+.progress-step-error {
+  border-left-color: #dc3545;
+  background: #fdf2f2;
+}
+
+.progress-step-icon {
+  margin-right: 12px;
+  font-size: 16px;
+  min-width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-step-label {
+  font-weight: 500;
+  color: #343a40;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-step-message {
+  font-size: 14px;
+  color: #6c757d;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.progress-step-time {
+  font-size: 12px;
+  color: #868e96;
+}
+
+/* Loading dots animation */
+.loading-dots {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background: #007bff;
+  border-radius: 50%;
+  animation: loading-dots 1.4s ease-in-out infinite both;
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes loading-dots {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(0, 123, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+  }
+}
+
+/* 스크롤바 스타일링 */
+.progress-stack::-webkit-scrollbar {
+  width: 6px;
+}
+
+.progress-stack::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.progress-stack::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.progress-stack::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .progress-stack {
+    padding: 12px;
+  }
+  
+  .progress-step {
+    padding: 8px;
+  }
+  
+  .progress-step-icon {
+    margin-right: 8px;
+    font-size: 14px;
+  }
+  
+  .progress-step-label {
+    font-size: 14px;
+  }
+  
+  .progress-step-message {
+    font-size: 13px;
+  }
+}
